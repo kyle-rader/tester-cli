@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
 
     let start_dir = env::current_dir()?;
 
-    let projects = WalkDir::new(start_dir)
+    let mut projects = WalkDir::new(start_dir)
         .max_depth(1) // problems should all be in the current directory
         .into_iter()
         .filter_map(|e| e.ok())
@@ -86,6 +86,8 @@ fn main() -> anyhow::Result<()> {
         .skip(1) // Skips the current directory itself which is first in the list
         .filter_map(|e| Project::detect(e.path()))
         .collect::<Vec<_>>();
+
+    projects.sort_by(|a, b| a.name.cmp(&b.name));
 
     projects.par_iter().for_each(|p| match p.test() {
         Ok(result) => println!("{result}"),
