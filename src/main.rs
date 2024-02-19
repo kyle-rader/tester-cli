@@ -4,6 +4,8 @@ use std::{
     process::Command,
 };
 
+use rayon::prelude::*;
+
 use clap::Parser;
 use walkdir::WalkDir;
 
@@ -32,12 +34,12 @@ impl Language {
         match self {
             Self::Rust => {
                 let mut cmd = Command::new("cargo");
-                cmd.args(&["test"]);
+                cmd.args(["test"]);
                 cmd
             }
             Self::Elixir => {
                 let mut cmd = Command::new("mix");
-                cmd.args(&["test"]);
+                cmd.args(["test"]);
                 cmd
             }
         }
@@ -76,17 +78,19 @@ fn main() -> anyhow::Result<()> {
 
     let start_dir = env::current_dir()?;
 
-    WalkDir::new(start_dir)
-        .max_depth(1)
+    let projects = WalkDir::new(start_dir)
+        .max_depth(1) // problems should all be in the current directory
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|entry| entry.file_type().is_dir())
-        .skip(1)
+        .skip(1) // Skips the current directory itself which is first in the list
         .filter_map(|e| Project::detect(e.path()))
-        .for_each(|p| match p.test() {
-            Ok(result) => println!("{result}"),
-            Err(err) => eprintln!("💣 {}: {err}", p.name),
-        });
+        .collect::<Vec<_>>();
+
+    projects.par_iter().for_each(|p| match p.test() {
+        Ok(result) => println!("{result}"),
+        Err(err) => eprintln!("💣 {}: {err}", p.name),
+    });
 
     Ok(())
 }
